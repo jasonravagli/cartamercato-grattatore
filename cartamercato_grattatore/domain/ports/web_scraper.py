@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 
+from overrides import EnforceOverrides  # noqa: ANN401
 
-class BaseWebScraper(ABC):
+
+class BaseWebScraper(ABC, EnforceOverrides):
     """Abstract interface defining web scraper functionality."""
 
     @abstractmethod

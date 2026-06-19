@@ -1,10 +1,12 @@
 import argparse
 from pathlib import Path
 
+from loguru import logger
+
 from cartamercato_grattatore.application.use_cases.scrape_products import ScrapeProducts
 from cartamercato_grattatore.global_utils.global_context import GlobalContextManager
+from cartamercato_grattatore.infrastructure.scraper_config import ScraperConfig
 from cartamercato_grattatore.infrastructure.web_scraper import SeleniumWebScraper
-from loguru import logger
 
 DEFAULT_CSV_PATH = Path("assets/products.csv")
 
@@ -42,7 +44,7 @@ def main() -> None:
     gc = GlobalContextManager()
     ctx = gc.get_global_context()
 
-    scraper = SeleniumWebScraper()
+    scraper = SeleniumWebScraper(config=ScraperConfig())
     use_case = ScrapeProducts(scraper=scraper, serialization_dir=ctx.path_serialization_dir)
 
     use_case.execute(args.csv_file)

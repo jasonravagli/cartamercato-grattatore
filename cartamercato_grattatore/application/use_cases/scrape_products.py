@@ -1,10 +1,11 @@
 import csv
 from pathlib import Path
 
+from loguru import logger
+
 from cartamercato_grattatore.domain.data_models.scraping import ProductURL
 from cartamercato_grattatore.domain.exceptions.scraping import ScrapingError
 from cartamercato_grattatore.domain.ports.web_scraper import BaseWebScraper
-from loguru import logger
 
 
 class ScrapeProducts:

@@ -41,7 +41,17 @@ repos:
         args: [--unsafe]
       - id: debug-statements
       - id: no-commit-to-branch
-        args: [--branch, development, --branch, staging, --branch, production]
+        args:
+          [
+            --branch,
+            main,
+            --branch,
+            development,
+            --branch,
+            staging,
+            --branch,
+            production,
+          ]
       - id: requirements-txt-fixer
 
   - repo: https://github.com/pre-commit/mirrors-prettier

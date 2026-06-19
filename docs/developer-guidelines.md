@@ -5,7 +5,7 @@
 - **Prefer OOP over functional programming**: classes are well-identifiable components of the project, easy to extend
 - When designing and implementing classes, SOLID principles must always be respected
 - **Interfaces**: when meaningful, define interfaces and subclass them in concrete classes to foster abstraction and replaceability of components
-- **Override Enforcement**: When defining an interface, inherit from `EnforceOverrides` and use `@override` decorator in subclasses to ensure that abstract methods are implemented and signature respected
+- **Override Enforcement**: When defining an interface, inherit from `EnforceOverrides` (from library `overrides`) and use `@override` decorator in subclasses to ensure that abstract methods are implemented and signature respected
 
 ## Error Handling
 
@@ -17,6 +17,9 @@
 ## Testing Standards
 
 - Add tests for new behavior — cover success, failure, and edge cases.
+- **Plan tests before writing them.**
+- Tests should be written based on the expected behavior of the class under test, not the implmentatation details.
+- Use the **TDD naming convention** for test methods: `test_<method>_when_<condition>_then/should_<expectation>`.
 - Use pytest patterns, not `unittest.TestCase`.
 - Use `spec/autospec` when mocking.
 - Use `time_machine` for time-dependent tests. Do not use `datetime.now()`
@@ -45,4 +48,4 @@
 - **Logging**: Use `loguru` logger (initialized via `GlobalContextManager`)
   - Named parameters: `logger.info("msg: {var}", var=value)`
   - Exceptions: `logger.exception()` for full traceback
-
+- **Public methods befor private ones**: public methods should appear before private ones inside a class, to improve readability.

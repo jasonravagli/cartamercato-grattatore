@@ -3,9 +3,10 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from cartamercato_grattatore.global_utils.singleton import singleton
 from loguru import logger
 from pydantic import BaseModel, ConfigDict
+
+from cartamercato_grattatore.global_utils.singleton import singleton
 
 
 class GlobalContext(BaseModel):

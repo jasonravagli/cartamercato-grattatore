@@ -29,22 +29,19 @@ install-test: # install test dependencies
 	uv sync --group test
 
 format: # format the code with the ruff tool
-	uv run ruff format cartamercato_grattatore tests utils
+	uv run ruff format cartamercato_grattatore tests
 
 format-check: # check the formatting code with ruff
-	uv run ruff format --check cartamercato_grattatore tests utils
+	uv run ruff format --check cartamercato_grattatore tests
 
 lint: # check the code style
-	uv run ruff check cartamercato_grattatore tests utils
+	uv run ruff check cartamercato_grattatore tests
 
 lint-fix: # check and fix the code style
-	uv run ruff check --fix cartamercato_grattatore tests utils
+	uv run ruff check --fix cartamercato_grattatore tests
 
 test: # launch the tests
 	uv run pytest -v --junitxml=tests_report.xml --doctest-modules --cov=cartamercato_grattatore --cov-report xml:coverage.xml --durations=0 tests
-
-tree: # print the structure of the repository ignoring what is declared in .gitignore
-	uv run python -m utils.tree
 
 # Create a wheel (.whl file) inside dist directory
 wheel: # create a wheel to distribute this software

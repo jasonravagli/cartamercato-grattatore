@@ -6,6 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
+from cartamercato_grattatore.infrastructure.scraper_config import RetryConfig, ScraperConfig
+
 
 @pytest.fixture
 def serialization_dir(tmp_path: Path) -> Path:
@@ -60,3 +62,17 @@ def mock_driver(mocker: MockerFixture) -> MagicMock:
     driver.page_source = "<html><body>Test</body></html>"
     mocker.patch("selenium.webdriver.Chrome", return_value=driver)
     return driver
+
+
+@pytest.fixture
+def mock_config() -> ScraperConfig:
+    """Provide a ScraperConfig with fast defaults for testing."""
+    return ScraperConfig(
+        headless=True,
+        page_load_timeout=5,
+        element_wait_timeout=2,
+        min_request_delay=0.0,
+        max_request_delay=0.0,
+        retry=RetryConfig(max_retries=0),
+        debug=False,
+    )
