@@ -1,3 +1,5 @@
+"""CLI entry point with dependency injection wiring."""
+
 import argparse
 from pathlib import Path
 
@@ -5,6 +7,9 @@ from loguru import logger
 
 from cartamercato_grattatore.application.use_cases.scrape_products import ScrapeProducts
 from cartamercato_grattatore.global_utils.global_context import GlobalContextManager
+from cartamercato_grattatore.infrastructure.html_extractor import (
+    BeautifulSoupCardmarketExtractor,
+)
 from cartamercato_grattatore.infrastructure.scraper_config import ScraperConfig
 from cartamercato_grattatore.infrastructure.web_scraper import SeleniumWebScraper
 
@@ -27,6 +32,12 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_CSV_PATH,
         help=f"Path to CSV file with product URLs (default: {DEFAULT_CSV_PATH})",
     )
+    parser.add_argument(
+        "--extract-info",
+        action="store_true",
+        default=True,
+        help="Also extract structured product data and save as JSON",
+    )
     return parser.parse_args(args)
 
 
@@ -45,6 +56,13 @@ def main() -> None:
     ctx = gc.get_global_context()
 
     scraper = SeleniumWebScraper(config=ScraperConfig())
-    use_case = ScrapeProducts(scraper=scraper, serialization_dir=ctx.path_serialization_dir)
+
+    extractor = BeautifulSoupCardmarketExtractor() if args.extract_info else None
+
+    use_case = ScrapeProducts(
+        scraper=scraper,
+        serialization_dir=ctx.path_serialization_dir,
+        extractor=extractor,
+    )
 
     use_case.execute(args.csv_file)
