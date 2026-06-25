@@ -37,6 +37,11 @@ class GlobalContextManager:
             raise RuntimeError("GlobalContextManager is not initialized yet.")
         return self._global_context
 
+    def reset(self) -> None:
+        """Reset the manager so it can be reinitialized with a fresh directory."""
+        self._initialized = False
+        self._global_context = None  # type: ignore[assignment]
+
     def _setup_serialization_dir(self) -> Path:
         path_root = Path("./logs/")
 
