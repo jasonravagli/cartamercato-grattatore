@@ -159,3 +159,5 @@ cython_debug/
 
 # Project specific
 logs
+
+data

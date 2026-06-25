@@ -20,9 +20,7 @@ from cartamercato_grattatore.infrastructure.scraper_config import ScraperConfig
 from cartamercato_grattatore.infrastructure.web_scraper import SeleniumWebScraper
 
 DEFAULT_CSV_PATH = Path("assets/products.csv")
-DEFAULT_SPREADSHEET_URL = (
-    "https://docs.google.com/spreadsheets/d/1H9smJPIGldj69qUm0mBoxHW9kJcUeA6-zR6Wnof0mcM/"
-)
+DEFAULT_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1MTOKCjuNwgSbbgLw_bGHk8ZB3oIb2oBmSeyGtRkgD2E/edit?gid=1368179043#gid=1368179043/"
 
 
 def parse_args(args: list[str] | None = None) -> argparse.Namespace:
