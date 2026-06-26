@@ -1,6 +1,8 @@
 """Use case to scrape product pages and save HTML content."""
 
 import csv
+import random
+import time
 from pathlib import Path
 
 from loguru import logger
@@ -40,6 +42,9 @@ class ScrapeProducts:
         self._serialization_dir = serialization_dir
         self._extractor = extractor
 
+        self._min_req_delay = 30.0
+        self._max_req_delay = 45.0
+
     def execute(self, csv_path: Path) -> None:
         """Execute the scraping process for products listed in the CSV file.
 
@@ -54,6 +59,10 @@ class ScrapeProducts:
 
         for product in products:
             self._scrape_and_save(product)
+
+            s_delay = random.uniform(self._min_req_delay, self._max_req_delay)
+            logger.info("Waiting {delay:.1f}s before next request", delay=s_delay)
+            time.sleep(s_delay)
 
         self._scraper.close()
         logger.info("Scraping completed")
