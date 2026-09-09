@@ -58,6 +58,7 @@ def mock_nodriver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Magi
     monkeypatch.setenv("NODRIVER_PROFILE_DIR", str(tmp_path))
 
     tab: MagicMock = MagicMock()
+    tab.evaluate = AsyncMock(return_value=2)
     browser: MagicMock = MagicMock()
     browser.get = AsyncMock(return_value=tab)
 
@@ -186,9 +187,9 @@ class TestNodriverWebScraper:
 
         scraper = NodriverWebScraper(config=_fast_config())
 
-        expected = Path("data") / "nodriver-profile"
+        expected = (Path("data") / "nodriver-profile").resolve()
         assert scraper._profile_dir == expected
-        assert (tmp_path / expected).is_dir()
+        assert expected.is_dir()
 
     def test_extract_value_unwraps_remote_object(self) -> None:
         class _RO:

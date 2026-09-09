@@ -94,6 +94,9 @@ class NodriverWebScraper(BaseWebScraper):
         """
         env_dir = os.environ.get("NODRIVER_PROFILE_DIR")
         path = Path(env_dir) if env_dir else Path("data") / "nodriver-profile"
+        # Chrome/nodriver need an absolute user-data-dir; a relative path can
+        # resolve against the wrong working directory on some platforms.
+        path = path.resolve()
         shutil.rmtree(path, ignore_errors=True)
         path.mkdir(parents=True, exist_ok=True)
         return path
@@ -118,8 +121,11 @@ class NodriverWebScraper(BaseWebScraper):
                 user_data_dir=str(self._profile_dir),
             )
             browser = await uc.start(uc_config)
-            # Open one tab that we will reuse for the entire run.
+            # Open one tab that we will reuse for the entire run. Some Windows
+            # setups report success here but silently fail to attach to the
+            # tab; verify the tab is actually connected before proceeding.
             tab = await browser.get("about:blank")
+            await tab.evaluate("1 + 1", return_by_value=True)
             return browser, tab
 
         future = asyncio.run_coroutine_threadsafe(_launch(), loop)
