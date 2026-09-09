@@ -31,9 +31,20 @@ class ScraperConfig(BaseModel):
     page_load_timeout: int = 30
     element_wait_timeout: int = 10
 
+    # Content-aware wait
+    # CSS selector that must be present for the page to be considered loaded.
+    # If absent (and no bot challenge is visible), scraping warns and proceeds.
+    content_marker: str = "#tabContent-info"
+    # Max seconds to wait for a bot challenge (e.g. Cloudflare) to resolve.
+    challenge_timeout: float = 20.0
+
     # Request delay to avoid detection (seconds)
-    min_request_delay: float = 1.0
-    max_request_delay: float = 3.0
+    min_request_delay: float = 3.0
+    max_request_delay: float = 5.0
+
+    # Settle delay after human-like interaction, before reading the page (seconds)
+    min_settle_delay: float = 1.0
+    max_settle_delay: float = 2.0
 
     # Retry configuration
     retry: RetryConfig = RetryConfig()

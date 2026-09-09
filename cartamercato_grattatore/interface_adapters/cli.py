@@ -16,11 +16,13 @@ from cartamercato_grattatore.infrastructure.google_sheets import GspreadSheetsWr
 from cartamercato_grattatore.infrastructure.html_extractor import (
     BeautifulSoupCardmarketExtractor,
 )
+from cartamercato_grattatore.infrastructure.nodriver_scraper import NodriverWebScraper
 from cartamercato_grattatore.infrastructure.scraper_config import ScraperConfig
 from cartamercato_grattatore.infrastructure.web_scraper import SeleniumWebScraper
 
 DEFAULT_CSV_PATH = Path("assets/products.csv")
-DEFAULT_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1MTOKCjuNwgSbbgLw_bGHk8ZB3oIb2oBmSeyGtRkgD2E/edit?gid=1368179043#gid=1368179043/"
+# DEFAULT_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1MTOKCjuNwgSbbgLw_bGHk8ZB3oIb2oBmSeyGtRkgD2E/edit?gid=1368179043#gid=1368179043/"
+DEFAULT_SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1H9smJPIGldj69qUm0mBoxHW9kJcUeA6-zR6Wnof0mcM/edit?usp=sharing"
 
 
 def parse_args(args: list[str] | None = None) -> argparse.Namespace:
@@ -69,6 +71,26 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
             "Comma-separated list of times (HH:MM) at which to run the scraper. "
             "When provided the app stays alive and executes the pipeline at each "
             "scheduled time until interrupted. Example: '09:00,14:00,20:00'"
+        ),
+    )
+    parser.add_argument(
+        "--scraper",
+        type=str,
+        default="nodriver",
+        choices=["nodriver", "selenium"],
+        help=(
+            "Scraping engine. 'nodriver' (default) uses a stealth Chromium with "
+            "a persistent profile and is required for Cloudflare-protected "
+            "sites; 'selenium' keeps the legacy Selenium browser."
+        ),
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        default=False,
+        help=(
+            "Run the browser headless. NOTE: Cardmarket hard-blocks headless "
+            "browsers, so leave this off for live scraping."
         ),
     )
     return parser.parse_args(args)
@@ -160,7 +182,16 @@ def _execute_pipeline(args: argparse.Namespace) -> None:
     gc = GlobalContextManager()
     ctx = gc.get_global_context()
 
-    scraper = SeleniumWebScraper(config=ScraperConfig())
+    config = ScraperConfig(headless=args.headless)
+    if args.scraper == "nodriver":
+        scraper = NodriverWebScraper(config=config)
+    else:
+        logger.warning(
+            "Using legacy Selenium scraper (Cardmarket is Cloudflare-protected; "
+            "'nodriver' is the supported engine)"
+        )
+        scraper = SeleniumWebScraper(config=config)
+
     try:
         extractor = BeautifulSoupCardmarketExtractor() if args.extract_info else None
 

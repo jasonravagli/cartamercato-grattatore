@@ -73,6 +73,8 @@ def mock_config() -> ScraperConfig:
         element_wait_timeout=2,
         min_request_delay=0.0,
         max_request_delay=0.0,
+        min_settle_delay=0.0,
+        max_settle_delay=0.0,
         retry=RetryConfig(max_retries=0),
         debug=False,
     )

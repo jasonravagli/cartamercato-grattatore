@@ -1,8 +1,9 @@
 """Tests for the SeleniumWebScraper infrastructure component."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
+from pytest_mock import MockerFixture
 
 from cartamercato_grattatore.domain.exceptions.scraping import ScrapingError
 from cartamercato_grattatore.infrastructure.scraper_config import (
@@ -14,6 +15,11 @@ from cartamercato_grattatore.infrastructure.web_scraper import SeleniumWebScrape
 
 class TestSeleniumWebScraper:
     """Tests for SeleniumWebScraper behavior."""
+
+    @pytest.fixture(autouse=True)
+    def _no_real_sleeps(self, mocker: MockerFixture) -> None:
+        """Stub time.sleep so human-simulation delays don't slow unit tests."""
+        mocker.patch("cartamercato_grattatore.infrastructure.web_scraper.time.sleep")
 
     # -- Original tests (behavior-focused, unchanged) --
 
@@ -77,6 +83,8 @@ class TestSeleniumWebScraper:
         config = ScraperConfig(
             min_request_delay=0.0,
             max_request_delay=0.0,
+            min_settle_delay=0.0,
+            max_settle_delay=0.0,
             retry=RetryConfig(max_retries=2, base_delay=0.0),
         )
 
@@ -121,3 +129,86 @@ class TestSeleniumWebScraper:
         scraper = SeleniumWebScraper(config=mock_config)
 
         assert scraper is not None
+
+    def test_scrape_when_bot_challenge_present_then_raises_scraping_error(
+        self, mock_driver: MagicMock, mock_config: ScraperConfig
+    ) -> None:
+        """A page stuck on a bot challenge should raise ScrapingError."""
+        mock_driver.page_source = (
+            "<html><body><h1>Just a moment...</h1>"
+            '<iframe src="https://challenges.cloudflare.com/cdn-cgi/challenge-platform/turnstile">'
+            "</body></html>"
+        )
+        mock_driver.find_elements.return_value = []
+        config = ScraperConfig(
+            headless=True,
+            page_load_timeout=5,
+            element_wait_timeout=2,
+            min_request_delay=0.0,
+            max_request_delay=0.0,
+            min_settle_delay=0.0,
+            max_settle_delay=0.0,
+            challenge_timeout=0.0,
+            retry=RetryConfig(max_retries=0),
+            debug=False,
+        )
+        scraper = SeleniumWebScraper(config=config)
+
+        with pytest.raises(ScrapingError, match="Bot challenge not resolved"):
+            scraper.scrape("https://example.com")
+
+    def test_scrape_when_bot_challenge_resolves_then_returns_content(
+        self, mock_driver: MagicMock
+    ) -> None:
+        """A challenge that auto-resolves should be awaited and scraped normally."""
+        challenge_html = "Just a moment... challenge-platform turnstile"
+        real_html = "<html><body><div id='tabContent-info'></div></body></html>"
+        config = ScraperConfig(
+            headless=True,
+            page_load_timeout=5,
+            element_wait_timeout=2,
+            min_request_delay=0.0,
+            max_request_delay=0.0,
+            min_settle_delay=0.0,
+            max_settle_delay=0.0,
+            challenge_timeout=5.0,
+            retry=RetryConfig(max_retries=0),
+            debug=False,
+        )
+        scraper = SeleniumWebScraper(config=config)
+
+        # page_source sequence: challenge page first, then the real page.
+        # A PropertyMock on the mock class acts as a data descriptor, so it
+        # takes over reads of the fixture's instance attribute for this scope.
+        with patch.object(
+            type(mock_driver),
+            "page_source",
+            new_callable=PropertyMock,
+            side_effect=[challenge_html, real_html, real_html, real_html, real_html],
+            create=True,
+        ):
+            # find_elements is polled by EC waits AND the content check; answer
+            # [] for the first few polls, then a found element so the challenge
+            # is treated as resolved.
+            fe_calls = {"n": 0}
+
+            def _find_elements(_self: object, *args: object, **kwargs: object) -> list:
+                fe_calls["n"] += 1
+                return [] if fe_calls["n"] <= 3 else ["info-container"]
+
+            mock_driver.find_elements.side_effect = _find_elements
+            html = scraper.scrape("https://example.com")
+
+        assert html == real_html
+
+    def test_scrape_when_content_marker_missing_then_returns_page_anyway(
+        self, mock_driver: MagicMock, mock_config: ScraperConfig
+    ) -> None:
+        """A page without the content marker (no challenge) returns as-is with a warning."""
+        mock_driver.page_source = "<html><body>Unexpected layout</body></html>"
+        mock_driver.find_elements.return_value = []
+        scraper = SeleniumWebScraper(config=mock_config)
+
+        html = scraper.scrape("https://example.com")
+
+        assert html == mock_driver.page_source

@@ -2,19 +2,23 @@
 
 import random
 import time
-from typing import override
+from typing import cast, override
 
 from loguru import logger
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from cartamercato_grattatore.domain.exceptions.scraping import ScrapingError
 from cartamercato_grattatore.domain.ports.web_scraper import BaseWebScraper
 from cartamercato_grattatore.infrastructure.scraper_config import ScraperConfig
+
+_CHALLENGE_MARKERS = ("just a moment", "challenge-platform", "turnstile")
 
 
 class SeleniumWebScraper(BaseWebScraper):
@@ -25,6 +29,7 @@ class SeleniumWebScraper(BaseWebScraper):
     - JavaScript-based webdriver masking
     - Configurable request delays
     - Content-aware page load waits
+    - Bot challenge (Cloudflare) detection with hard failure
     - Retry with exponential backoff
     """
 
@@ -82,7 +87,7 @@ class SeleniumWebScraper(BaseWebScraper):
         self._driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {"source": script})
 
     def _wait_for_content(self) -> None:
-        """Wait for page content to load by checking for body elements."""
+        """Wait for initial page content to load by checking for body elements."""
         wait = WebDriverWait(self._driver, self._config.element_wait_timeout)
         try:
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
@@ -90,10 +95,101 @@ class SeleniumWebScraper(BaseWebScraper):
         except TimeoutException:
             logger.warning("Content wait timed out, proceeding anyway")
 
-    def _random_delay(self) -> None:
-        """Sleep for a random duration to simulate human behavior."""
-        delay = random.uniform(self._config.min_request_delay, self._config.max_request_delay)
+    def _simulate_human_activity(self) -> None:
+        """Simulate human page interaction: move the mouse, pause, then scroll.
+
+        Anti-bot systems (e.g. Cloudflare) watch for post-load interaction
+        signals. Moving the pointer, pausing like a human reading the page,
+        and scrolling encourages lazy-loaded content to materialize and adds
+        behavioral signals that a non-bot visitor would produce.
+        """
+        try:
+            body = self._driver.find_element(By.TAG_NAME, "body")
+
+            # Move the pointer along a few irregular points.
+            locations = [
+                (0.3, 0.2),
+                (0.6, 0.4),
+                (0.45, 0.65),
+                (0.7, 0.8),
+            ]
+            for x_ratio, y_ratio in locations:
+                self._move_to(body, x_ratio, y_ratio)
+                time.sleep(random.uniform(0.15, 0.6))
+
+            # Human-like reading pause between moving and scrolling.
+            time.sleep(random.uniform(0.8, 2.0))
+
+            # Scroll down in a couple of steps to trigger lazy loading.
+            for step in (250, 400):
+                self._driver.execute_script(f"window.scrollBy(0, {step});")
+                time.sleep(random.uniform(0.3, 0.8))
+        except WebDriverException as e:
+            logger.warning("Human activity simulation skipped: {error}", error=e)
+
+    def _move_to(self, element: WebElement, x_ratio: float, y_ratio: float) -> None:
+        """Move the pointer to a fractional position (0-1) of the element."""
+        size: dict[str, int] = cast("dict[str, int]", element.size)
+        x = max(0, int(size["width"] * x_ratio))
+        y = max(0, int(size["height"] * y_ratio))
+        ActionChains(self._driver).move_by_offset(x, y).perform()
+
+    def _wait_for_settle(self) -> None:
+        """Wait a randomized interval for dynamic content and anti-bot checks to settle."""
+        delay = random.uniform(self._config.min_settle_delay, self._config.max_settle_delay)
+        logger.debug("Waiting {delay:.1f}s for the page to settle", delay=delay)
         time.sleep(delay)
+
+    def _check_page_state(self) -> tuple[bool, bool]:
+        """Check page source for bot challenges and real content.
+
+        Returns:
+            A tuple (challenge_present, content_present) where
+            challenge_present is True if any known bot challenge marker is
+            found in the page source, and content_present is True if the
+            configured content_marker element exists in the DOM.
+        """
+        page_source = self._driver.page_source.lower()
+        challenge_present = any(marker in page_source for marker in _CHALLENGE_MARKERS)
+        content_present = self._driver.find_elements(By.CSS_SELECTOR, self._config.content_marker)
+        return challenge_present, bool(content_present)
+
+    def _wait_for_real_content(self, url: str) -> None:
+        """Wait until the page shows real content, retrying if a bot challenge is active.
+
+        Polls the page source until the configured content_marker is present.
+        If a bot challenge (e.g. Cloudflare Turnstile) is detected, waits up to
+        challenge_timeout seconds for it to auto-resolve before giving up.
+
+        Raises:
+            ScrapingError: If a bot challenge is still active after challenge_timeout.
+        """
+        deadline = time.monotonic() + self._config.challenge_timeout
+        poll_interval = 2.0
+
+        while True:
+            challenge, content = self._check_page_state()
+
+            if content and not challenge:
+                return
+            if challenge:
+                if time.monotonic() >= deadline:
+                    msg = (
+                        f"Bot challenge not resolved for {url} "
+                        f"(exceeded {self._config.challenge_timeout:.0f}s)"
+                    )
+                    raise ScrapingError(msg)
+                logger.debug("Bot challenge detected for {url}, waiting for auto-resolve", url=url)
+                time.sleep(poll_interval)
+                continue
+            # No challenge and no content — page loaded but marker missing (layout change?)
+            logger.warning(
+                "Content marker '{marker}' not found for {url}; "
+                "page may have changed layout. Proceeding anyway.",
+                marker=self._config.content_marker,
+                url=url,
+            )
+            return
 
     @override
     def scrape(self, url: str) -> str:
@@ -173,11 +269,17 @@ class SeleniumWebScraper(BaseWebScraper):
             # Navigate to the page
             self._driver.get(url)
 
-            # Wait for content to load
+            # Wait for initial content to load
             self._wait_for_content()
 
-            # Random delay to avoid detection
-            self._random_delay()
+            # Simulate human interaction while the page finishes loading
+            self._simulate_human_activity()
+
+            # Wait for real content (detection of bot challenges)
+            self._wait_for_real_content(url)
+
+            # Final wait so dynamic content and anti-bot checks settle
+            self._wait_for_settle()
 
             return self._driver.page_source
 

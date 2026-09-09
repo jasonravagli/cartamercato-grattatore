@@ -20,6 +20,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Browser profile for the nodriver scraper (runtime artifact; keeps cf_clearance cookie)
+data/nodriver-profile/
+
 # C extensions
 *.so
 
