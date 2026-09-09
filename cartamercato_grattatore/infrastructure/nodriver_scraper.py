@@ -26,7 +26,6 @@ import contextlib
 import os
 import random
 import shutil
-import sys
 import threading
 import time
 from pathlib import Path
@@ -142,8 +141,8 @@ class NodriverWebScraper(BaseWebScraper):
         which manifests as the browser opening but CDP calls silently never
         completing. A ``SelectorEventLoop`` (the Unix default) works there.
         """
-        if sys.platform == "win32":
-            return asyncio.SelectorEventLoop()
+        # if sys.platform == "win32":
+        #     return asyncio.SelectorEventLoop()
         return asyncio.new_event_loop()
 
     def _submit(self, coro: CoroutineType, timeout: float) -> object:
