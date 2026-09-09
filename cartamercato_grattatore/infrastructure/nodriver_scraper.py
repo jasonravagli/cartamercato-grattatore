@@ -26,6 +26,7 @@ import contextlib
 import os
 import random
 import shutil
+import sys
 import threading
 import time
 from pathlib import Path
@@ -106,7 +107,7 @@ class NodriverWebScraper(BaseWebScraper):
         if self._browser is not None:
             return
 
-        loop = asyncio.new_event_loop()
+        loop = self._new_loop()
         loop_thread = threading.Thread(target=loop.run_forever, name="nodriver-loop", daemon=True)
         loop_thread.start()
 
@@ -131,6 +132,19 @@ class NodriverWebScraper(BaseWebScraper):
         future = asyncio.run_coroutine_threadsafe(_launch(), loop)
         self._browser, self._tab = future.result(timeout=self._config.page_load_timeout + 30)
         logger.info("Nodriver browser launched (tab ready)")
+
+    @staticmethod
+    def _new_loop() -> asyncio.AbstractEventLoop:
+        """Create the event loop driving the browser.
+
+        On Windows, Python's default ``ProactorEventLoop`` does not support
+        some of the socket primitives used by nodriver's connection layer,
+        which manifests as the browser opening but CDP calls silently never
+        completing. A ``SelectorEventLoop`` (the Unix default) works there.
+        """
+        if sys.platform == "win32":
+            return asyncio.SelectorEventLoop()
+        return asyncio.new_event_loop()
 
     def _submit(self, coro: CoroutineType, timeout: float) -> object:
         """Run a coroutine on the owned loop from this (sync) thread."""
