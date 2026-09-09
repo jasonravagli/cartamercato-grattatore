@@ -2,21 +2,41 @@
 
 Scrapes product information from Cardmarket and publishes it to a Google Spreadsheet.
 
+## How to update the project
+
+From the terminal, move to the project directory:
+
+```
+cd path/to/folder
+```
+
+Then run:
+
+```
+git pull
+```
+
 ## How to Run
 
-1. Install [uv](https://docs.astral.sh/uv/), then install dependencies:
+1. From the terminal, move to the project directory:
+
+    ```
+    cd path/to/folder
+    ```
+
+2. Install [uv](https://docs.astral.sh/uv/), then install dependencies:
 
    ```bash
    make install
    ```
 
-2. Run the application:
+3. Run the application:
 
    ```bash
    uv run python -m cartamercato_grattatore
    ```
 
-   Each run creates a `logs/{timestamp}-{uuid}/` directory with logs and session artifacts.
+   Each run creates a `logs/{timestamp}-{uuid}/` directory with logs and session artifacts. See the following section for more arguments
 
 ### Useful options
 
