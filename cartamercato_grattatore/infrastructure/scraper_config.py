@@ -1,4 +1,4 @@
-"""Configuration for the Selenium web scraper."""
+"""Configuration for the web scrapers (Selenium and nodriver)."""
 
 from pydantic import BaseModel, ConfigDict
 
@@ -20,7 +20,9 @@ class ScraperConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     # Browser settings
-    headless: bool = True
+    # NOTE: nodriver must run in a visible window — headless mode is hard-
+    # blocked by Cardmarket's Cloudflare protection (validated live).
+    headless: bool = False
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "

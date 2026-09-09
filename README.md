@@ -27,7 +27,7 @@ git pull
 2. Install [uv](https://docs.astral.sh/uv/), then install dependencies:
 
    ```bash
-   make install
+   uv sync --all-groups
    ```
 
 3. Run the application:

@@ -164,6 +164,32 @@ class TestNodriverWebScraper:
 
     # -- unit: value unwrapping -----------------------------------------------
 
+    def test_profile_dir_is_reset_on_init(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A stale profile directory is wiped on every scraper instantiation."""
+        profile = tmp_path / "profile"
+        (profile / "Default").mkdir(parents=True)
+        (profile / "Default" / "Cookies").write_text("stale cf_clearance")
+        monkeypatch.setenv("NODRIVER_PROFILE_DIR", str(profile))
+
+        scraper = NodriverWebScraper(config=_fast_config())
+
+        assert scraper._profile_dir == profile
+        assert not (profile / "Default" / "Cookies").exists()
+
+    def test_profile_dir_when_env_unset_then_uses_default(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("NODRIVER_PROFILE_DIR", raising=False)
+        monkeypatch.chdir(tmp_path)
+
+        scraper = NodriverWebScraper(config=_fast_config())
+
+        expected = Path("data") / "nodriver-profile"
+        assert scraper._profile_dir == expected
+        assert (tmp_path / expected).is_dir()
+
     def test_extract_value_unwraps_remote_object(self) -> None:
         class _RO:
             value = 7

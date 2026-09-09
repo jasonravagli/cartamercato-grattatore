@@ -7,9 +7,11 @@ This is the recommended implementation for Cardmarket. As validated live on
   challenge that never auto-resolves.
 - ``nodriver`` in headless mode receives a hard block ("Sorry, you have been
   blocked") with no interactive challenge.
-- ``nodriver`` in a **visible** window, using a **persistent user-data
-  profile**, passes the managed challenge (auto-resolved, no manual click
-  needed) and loads the real product page in a few seconds.
+- ``nodriver`` in a **visible** window, using a **fresh user-data profile
+  per run**, passes the managed challenge (auto-resolved, no manual click
+  needed) and loads the real product page in a few seconds. The profile is
+  reset at each run start: reusing a profile across runs eventually leads
+  Cloudflare to hard-block it (stale ``cf_clearance``), as observed live.
 
 The public interface is synchronous (``scrape``/``close``) to match
 :class:`~cartamercato_grattatore.domain.ports.web_scraper.BaseWebScraper`.
@@ -23,6 +25,7 @@ import asyncio
 import contextlib
 import os
 import random
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -44,13 +47,12 @@ _HARD_BLOCK_MARKER = "you have been blocked"
 
 
 class NodriverWebScraper(BaseWebScraper):
-    """Web scraper built on nodriver (stealth Chromium) with a persistent profile.
+    """Web scraper built on nodriver (stealth Chromium) with a per-run profile.
 
     Uses a visible browser window (config ``headless=False``) because
     headless is hard-blocked by Cardmarket's Cloudflare protection. The
-    browser keeps a persistent ``user_data_dir`` so a ``cf_clearance``
-    cookie, once obtained, is reused for subsequent pages within and across
-    runs.
+    browser starts from a profile reset at each run: a ``cf_clearance``
+    cookie, once obtained, is reused for subsequent pages of the same run.
 
     A single background event loop drives all nodriver calls. The browser is
     started lazily on the first :meth:`scrape` and closed in :meth:`close`.
@@ -61,9 +63,11 @@ class NodriverWebScraper(BaseWebScraper):
 
         Args:
             config: Scraper configuration. Uses sensible defaults if not
-                provided. The persistent profile directory is taken from the
+                provided. The profile directory is taken from the
                 ``NODRIVER_PROFILE_DIR`` environment variable, or a
                 project-local ``data/nodriver-profile`` directory by default.
+                The profile is reset (deleted) on every instantiation so each
+                run starts from a clean browser state.
         """
         self._config = config or ScraperConfig()
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -81,9 +85,16 @@ class NodriverWebScraper(BaseWebScraper):
 
     @staticmethod
     def _resolve_profile_dir() -> Path:
-        """Return the persistent browser profile directory, creating it."""
+        """Return a clean profile directory, wiping any previous one.
+
+        Reusing a profile across runs eventually leads Cloudflare to hard
+        block it (stale/flagged ``cf_clearance``), so each scraper instance
+        starts from a fresh profile; the cookie, once obtained, is still
+        reused for all pages within the same run.
+        """
         env_dir = os.environ.get("NODRIVER_PROFILE_DIR")
         path = Path(env_dir) if env_dir else Path("data") / "nodriver-profile"
+        shutil.rmtree(path, ignore_errors=True)
         path.mkdir(parents=True, exist_ok=True)
         return path
 
